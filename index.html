@@ -20,7 +20,10 @@ button{padding:14px 20px;border:none;border-radius:10px;background:#0f766e;color
 .okfull,.kofull{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9999;color:white}
 .okfull{background:#16a34a}.kofull{background:#dc2626}
 .big{font-size:110px}.msg{font-size:42px;font-weight:bold}.sub{font-size:24px;margin-top:10px}
-#historial{max-height:320px;overflow:auto;text-align:left;margin-top:15px}
+.filter-bar{display:flex;align-items:center;gap:8px;background:#f8fafc;border:2px solid #e5e7eb;border-radius:12px;padding:10px 12px;margin-top:10px}
+.filter-bar label{font-size:15px;font-weight:bold;color:#0f766e;white-space:nowrap}
+.filter-select{flex:1;padding:9px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#ffffff;font-size:15px;font-weight:bold;color:#1f2937}
+#historial{max-height:320px;overflow:auto;text-align:left;margin-top:12px}
 .item{border-bottom:1px solid #ddd;padding:8px;font-size:14px}.item img{max-width:85px;border-radius:8px;margin-top:5px}
 .oktag{color:#16a34a;font-weight:bold}.errtag{color:#dc2626;font-weight:bold}
 </style></head><body>
@@ -39,10 +42,19 @@ button{padding:14px 20px;border:none;border-radius:10px;background:#0f766e;color
 <div class="inputbox"><div class="label">📄 Lectura 1</div><input id="c1" readonly></div>
 <div class="inputbox"><div class="label">📦 Lectura 2</div><input id="c2" readonly></div>
 <button onclick="iniciarCamara()">📷 Iniciar cámara</button>
-<h3>Historial últimos 30 días</h3><div id="historial"></div></div>
+<h3>Historial últimos 30 días</h3>
+<div class="filter-bar">
+  <label for="filtroDia">📅 Filtrar día:</label>
+  <select id="filtroDia" class="filter-select" onchange="cambiarFiltroDia()">
+    <option value="TODOS">Todos los días</option>
+  </select>
+</div>
+<div id="historial"></div></div>
 <script>
-let qrScanner=null,codigo1='',codigo2='',bloqueo=false,ultimoFrame='';const DIAS=30;
-function cargarHist(){let h=JSON.parse(localStorage.getItem('historialV52')||'[]');let lim=Date.now()-DIAS*24*60*60*1000;h=h.filter(x=>new Date(x.fechaISO).getTime()>lim);localStorage.setItem('historialV52',JSON.stringify(h));document.getElementById('historial').innerHTML=h.map(x=>`<div class=item><b>${x.fecha}</b> <span class='${x.resultado==='OK'?'oktag':'errtag'}'>${x.resultado}</span><br>${x.c1}<br>${x.c2}<br><img src='${x.img}'></div>`).join('');}
+let qrScanner=null,codigo1='',codigo2='',bloqueo=false,ultimoFrame='',diaSeleccionado='TODOS';const DIAS=30;
+function obtenerClaveDia(item){if(item&&item.fechaISO){let d=new Date(item.fechaISO);if(!isNaN(d.getTime()))return d.toLocaleDateString('es-ES');}if(item&&item.fecha){let partes=String(item.fecha).split(',')[0].trim();if(partes)return partes;}return 'Sin fecha';}
+function cambiarFiltroDia(){diaSeleccionado=document.getElementById('filtroDia').value;cargarHist();}
+function cargarHist(){let h=JSON.parse(localStorage.getItem('historialV52')||'[]');let lim=Date.now()-DIAS*24*60*60*1000;h=h.filter(x=>new Date(x.fechaISO).getTime()>lim);localStorage.setItem('historialV52',JSON.stringify(h));let hoy=new Date().toLocaleDateString('es-ES');let conteoDias={};let ordenDias=[];for(let i=0;i<h.length;i++){let dia=obtenerClaveDia(h[i]);if(!conteoDias[dia]){conteoDias[dia]=0;ordenDias.push(dia);}conteoDias[dia]++;}let sel=document.getElementById('filtroDia');let previo=diaSeleccionado;sel.innerHTML='<option value="TODOS">Todos los días ('+h.length+')</option>';for(let j=0;j<ordenDias.length;j++){let fDia=ordenDias[j];let opt=document.createElement('option');opt.value=fDia;opt.textContent=(fDia===hoy?'Hoy · '+fDia:fDia)+' ('+conteoDias[fDia]+')';sel.appendChild(opt);}if(previo!=='TODOS'&&!conteoDias[previo]){diaSeleccionado='TODOS';}sel.value=diaSeleccionado;let filtrados=diaSeleccionado==='TODOS'?h:h.filter(x=>obtenerClaveDia(x)===diaSeleccionado);document.getElementById('historial').innerHTML=filtrados.map(x=>`<div class=item><b>${x.fecha}</b> <span class='${x.resultado==='OK'?'oktag':'errtag'}'>${x.resultado}</span><br>${x.c1}<br>${x.c2}<br><img src='${x.img}'></div>`).join('');}
 function guardar(r){let h=JSON.parse(localStorage.getItem('historialV52')||'[]');h.unshift({fecha:new Date().toLocaleString(),fechaISO:new Date().toISOString(),resultado:r,c1:codigo1,c2:codigo2,img:ultimoFrame});localStorage.setItem('historialV52',JSON.stringify(h));cargarHist();}
 function beep(f,d){const c=new(window.AudioContext||window.webkitAudioContext)();const o=c.createOscillator();const g=c.createGain();o.connect(g);g.connect(c.destination);o.frequency.value=f;o.start();o.stop(c.currentTime+d/1000);}
 async function cerrarCamara(){if(qrScanner){try{await qrScanner.stop();}catch(e){}try{await qrScanner.clear();}catch(e){}qrScanner=null;}}
